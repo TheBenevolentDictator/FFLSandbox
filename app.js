@@ -532,6 +532,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (renderer && datavisContent) {
       datavisContent.innerHTML = renderer(activeLeagueData);
       initTableSorting(datavisContent);
+
+      // Trigger Flourish auto-sizing embed script whenever a Flourish view loads
+      if (datavisContent.querySelector(".flourish-embed")) {
+        window.FlourishLoaded = false;
+        const oldScript = document.getElementById("flourish-embed-script");
+        if (oldScript) oldScript.remove();
+
+        const script = document.createElement("script");
+        script.id = "flourish-embed-script";
+        script.src = "https://public.flourish.studio/resources/embed.js";
+        document.body.appendChild(script);
+      }
     }
   }
 
