@@ -77,7 +77,7 @@ const DEFAULT_LEAGUE_DATA = {
     { rank: 13, prevRank: 14, team: "Matt", manager: "Matt", record: "0-4", pf: 445.3, pa: 540.0, powerScore: 1002.0, trend: 1, tier: "Tier 5: Cellar" },
     { rank: 14, prevRank: 13, team: "Nigel", manager: "Nigel", record: "0-4", pf: 397.9, pa: 535.1, powerScore: 864.6, trend: -1, tier: "Tier 5: Cellar" }
   ],
-
+};
 // 3. Visualization Definitions & Metadata
 const DATA_VIS_ITEMS = [
   {
