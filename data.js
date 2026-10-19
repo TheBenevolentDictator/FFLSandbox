@@ -34,7 +34,7 @@ const LEAGUE_CONFIG = {
   }
 };
 
-// 2. Default League Dataset
+// 2. Realistic Default League Dataset
 const DEFAULT_LEAGUE_DATA = {
   teams: [
     { id: 1, name: "Iain", manager: "Iain", avatar: "🏈" },
@@ -53,6 +53,7 @@ const DEFAULT_LEAGUE_DATA = {
     { id: 14, name: "Nigel", manager: "Nigel", avatar: "🦁" }
   ],
   weeks: ["Week 1", "Week 2", "Week 3", "Week 4"],
+
   powerRankings: [
     { rank: 1, prevRank: 1, team: "Iain", manager: "Iain", record: "4-0", pf: 564.1, pa: 480.0, powerScore: 2093.5, trend: 0, tier: "Tier 1: Heavyweight" },
     { rank: 2, prevRank: 4, team: "Lana", manager: "Lana", record: "3-1", pf: 534.4, pa: 490.2, powerScore: 1818.8, trend: 2, tier: "Tier 1: Heavyweight" },
@@ -476,7 +477,7 @@ function renderExpectedRecord(data) {
                 <tr>
                   <td class="sticky-col"><span class="team-title-bold">${item.manager}</span></td>
                   <td><span class="record-badge">${item.actualW}-${item.actualL}</span></td>
-                  <td class="bold-stat">${item.expW}-${item.expL}</td>
+                  <td class="bold-stat">${item.expW.toFixed(2)}-${item.expL.toFixed(2)}</td>
                   <td>
                     <span class="luck-badge" style="${getLuckGradientStyle(item.luckDiff, minDiff, maxDiff)}">
                       ${luckSign}
@@ -1229,7 +1230,7 @@ window.FFL_DATA = {
         <div class="vis-view-wrapper" style="padding: 1rem;">
           <iframe 
             src="https://flo.uri.sh/visualisation/30507835/embed" 
-            title="Season Standings Race" 
+            title="Standings Line Race" 
             frameborder="0" 
             scrolling="no" 
             style="width: 100%; height: 75vh; min-height: 600px; border: none; border-radius: 8px;"
