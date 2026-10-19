@@ -2,8 +2,12 @@
 
 // 1. Google Sheets Configuration
 const LEAGUE_CONFIG = {
+  // To connect your Google Sheet:
+  // 1. In Google Sheets: File > Share > Publish to web > Click Publish.
+  // 2. Paste your Sheet ID here or use the "⚙️ Google Sheet Sync" button in the site header.
   sheetId: localStorage.getItem("ffl_sheet_id") || "2PACX-1vTb7JO_6jjLvhD2GwVUUbZ9OXJA8T6fjxx_KJ3DyoTA9GUWVTFBgrJchnTfUu2i9_n4v66BcP8r-o0y",
 
+  // Tab names in your Google Sheet matching the 6 views:
   tabNames: {
     powerRankings: "MASTER",
     weeklyPr: "Weekly PR",
@@ -14,16 +18,18 @@ const LEAGUE_CONFIG = {
     strengthOfSchedule: "SoS"
   },
 
+  // Direct tab GIDs extracted from published Google Sheet
   tabGids: {
     "power-rankings": "1584196681",
     "weekly-pr": "1417547424",
     "weekly-points": "1667350132",
     "weekly-ranks": "1430645840",
     "expected-record": "492806340",
-    "heatmap": "609267916",
+    "heatmap": "609267916", // WL Heatmap Ordered
     "strength-of-schedule": "1153918705"
   },
 
+  // Optional: direct embed URLs from Google Sheets (File > Share > Publish to web > Embed > select tab)
   embedUrls: {
     powerRankings: "",
     weeklyPoints: "",
@@ -35,6 +41,7 @@ const LEAGUE_CONFIG = {
 };
 
 // 2. Realistic Default League Dataset
+// (Displayed immediately and serves as fallback when Google Sheet is not yet connected)
 const DEFAULT_LEAGUE_DATA = {
   teams: [
     { id: 1, name: "Iain", manager: "Iain", avatar: "🏈" },
@@ -116,6 +123,9 @@ const DEFAULT_LEAGUE_DATA = {
     { rank: 12, team: "Allen Wrench", manager: "Nick", actualW: 1, actualL: 4, expW: 2, expL: 53, expWinPct: 0.036, actualWinPct: 0.200, luckDiff: 0.8, status: "Lucky Win" }
   ],
 
+  // W-L Heatmap: Shows each person's weekly scoring rank for each win and loss!
+  // result: "W" or "L", rank: scoring rank that week (1-12)
+  // note: "bad-beat" if lost with top-6 score, "bailout" if won with bottom-6 score
   heatmap: [
     {
       team: "Mahomes Magic", manager: "Dan",
@@ -310,15 +320,6 @@ const DATA_VIS_ITEMS = [
     badge: "Defense",
     tag: "Difficulty Rating",
     description: "Opponent scoring faced (PA), opponent rank average, and schedule difficulty ratings."
-  },
-  {
-    id: "line-race",
-    title: "Standings Race",
-    shortTitle: "Line Race",
-    icon: "🏎️",
-    badge: "Animated",
-    tag: "Season Race",
-    description: "Animated week-by-week line race across the fantasy season."
   }
 ];
 
@@ -373,27 +374,36 @@ async function fetchGoogleSheetTab(sheetId, tabName, visId) {
   return parseCSV(text);
 }
 
-// Helpers: Visual Scales
+// 6. View Renderers
+
+// Color gradient scale for ranks 1 to 14
+// Standard: #1 is Green (best), #7.5 is Yellow, #14 is Red (worst)
+// Inverted: #1 is Red (hardest schedule), #7.5 is Yellow, #14 is Green (easiest schedule)
 function getRankGradientStyle(val, inverted = false) {
   const r = parseFloat(val);
   if (isNaN(r) || r < 1) return '';
   const clamped = Math.max(1, Math.min(14, r));
-  const t = (clamped - 1) / 13;
+  const t = (clamped - 1) / 13; // 0 for #1, 1 for #14
   const hue = Math.round((inverted ? t : (1 - t)) * 130);
   return `background: hsla(${hue}, 70%, 20%, 0.5); color: hsl(${hue}, 85%, 68%); border: 1px solid hsla(${hue}, 70%, 42%, 0.45);`;
 }
 
+// Percentile gradient scale for Weekly Points
+// 100th percentile = Green (hue 130), 50th percentile = Yellow (hue 65), 0th percentile = Red (hue 0)
 function getScoreGradientStyle(score, minScore, maxScore) {
   const s = parseFloat(score);
   if (isNaN(s) || s <= 0) return '';
   const min = parseFloat(minScore);
   const max = parseFloat(maxScore);
   if (isNaN(min) || isNaN(max) || max <= min) return '';
-  const t = Math.max(0, Math.min(1, (s - min) / (max - min)));
+  const t = Math.max(0, Math.min(1, (s - min) / (max - min))); // 0 (0th %ile) to 1 (100th %ile)
   const hue = Math.round(t * 130);
   return `background: hsla(${hue}, 70%, 18%, 0.45); color: hsl(${hue}, 85%, 72%); border: 1px solid hsla(${hue}, 70%, 42%, 0.4); font-weight: 700; border-radius: 4px; padding: 0.1rem 0.25rem; display: inline-block;`;
 }
 
+// Detailed luck gradient scale for Win Luck and Power Rankings
+// Closer to 0 -> fades into opaque/neutral background with muted text
+// Large luck values -> rich, vivid saturated color and border
 function getLuckGradientStyle(diff, minDiff = -1.5, maxDiff = 1.5) {
   const d = parseFloat(diff);
   if (isNaN(d)) return '';
@@ -421,6 +431,7 @@ function getLuckGradientStyle(diff, minDiff = -1.5, maxDiff = 1.5) {
   }
 }
 
+// Count total weeks at #1 in the "Weekly PR" tab
 function getWeeksAtNumberOne(managerName, weeklyPrRows) {
   if (!weeklyPrRows || weeklyPrRows.length < 2 || !managerName) return 0;
   const target = managerName.trim().toLowerCase();
@@ -454,8 +465,8 @@ function getWeeksAtNumberOne(managerName, weeklyPrRows) {
   }
   return 0;
 }
-// 6. View Renderers
 
+// RENDERER 1: POWER RANKINGS
 function renderPowerRankings(data) {
   const list = data.powerRankings || DEFAULT_LEAGUE_DATA.powerRankings;
   const topTeam = list[0];
@@ -521,10 +532,12 @@ function renderPowerRankings(data) {
   `;
 }
 
+// RENDERER 2: WEEKLY POINTS SCORED
 function renderWeeklyPoints(data) {
   const list = data.weeklyScores || DEFAULT_LEAGUE_DATA.weeklyScores;
   const weeks = data.weeks || DEFAULT_LEAGUE_DATA.weeks;
 
+  // Calculate min and max per week across all managers for percentile coloring
   const weekMinMax = weeks.map((w, i) => {
     const scores = list.map(item => item.scores[i]).filter(s => s > 0);
     return {
@@ -582,6 +595,7 @@ function renderWeeklyPoints(data) {
   `;
 }
 
+// RENDERER 3: WEEKLY POINTS SCORED RANK
 function renderWeeklyRanks(data) {
   const list = data.weeklyRanks || DEFAULT_LEAGUE_DATA.weeklyRanks;
   const weeks = data.weeks || DEFAULT_LEAGUE_DATA.weeks;
@@ -603,7 +617,8 @@ function renderWeeklyRanks(data) {
               <tr>
                 <td class="sticky-col"><span class="team-title-bold">${item.manager}</span></td>
                 <td class="fixed-rank-val"><span class="rank-box" style="${getRankGradientStyle(idx + 1)}">#${idx + 1}</span></td>
-                <td class="fixed-rank-val"><span class="rank-box-wide" style="${getRankGradientStyle(item.avgRank)}">#${item.avgRank.toFixed(1)}</span></td>${item.ranks.map(r => `
+                <td class="fixed-rank-val"><span class="rank-box-wide" style="${getRankGradientStyle(item.avgRank)}">#${item.avgRank.toFixed(1)}</span></td>
+                ${item.ranks.map(r => `
                   <td class="fixed-rank-val">
                     <span class="rank-box" style="${getRankGradientStyle(r)}">${r}</span>
                   </td>
@@ -617,6 +632,7 @@ function renderWeeklyRanks(data) {
   `;
 }
 
+// RENDERER 4: EXPECTED W-L RECORD
 function renderExpectedRecord(data) {
   const list = data.expectedRecord || DEFAULT_LEAGUE_DATA.expectedRecord;
   const minDiff = Math.min(...list.map(i => i.luckDiff));
@@ -666,6 +682,7 @@ function renderExpectedRecord(data) {
   `;
 }
 
+// RENDERER 5: W-L HEATMAP
 function renderHeatmap(data) {
   const list = data.heatmap || DEFAULT_LEAGUE_DATA.heatmap;
 
@@ -724,6 +741,7 @@ function renderHeatmap(data) {
   `;
 }
 
+// RENDERER 6: STRENGTH OF SCHEDULE
 function renderStrengthOfSchedule(data) {
   const list = data.strengthOfSchedule || DEFAULT_LEAGUE_DATA.strengthOfSchedule;
 
@@ -759,20 +777,7 @@ function renderStrengthOfSchedule(data) {
   `;
 }
 
-// RENDERER 6B: STANDINGS LINE RACE (FLOURISH)
-function renderLineRace() {
-  return `
-    <div class="vis-view-wrapper">
-      <div class="flourish-embed flourish-chart" data-src="visualisation/30507835">
-        <noscript>
-          <img src="https://public.flourish.studio/visualisation/30507835/thumbnail" width="100%" alt="chart visualization" />
-        </noscript>
-      </div>
-    </div>
-  `;
-}
-
-// 7. Dynamic Live Google Sheet Tab Renderer
+// RENDERER 7: DYNAMIC LIVE GOOGLE SHEET TAB RENDERER
 function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
   if (!rows || rows.length < 2) {
     return `<div class="vis-view-wrapper"><p class="muted-stat">No data found in tab "${tabName}".</p></div>`;
@@ -801,6 +806,7 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
     'Yliana': 'Still a Student'
   };
 
+  // Helper to dynamically find a manager in any row regardless of column deletions/movements
   function findManagerInRow(r) {
     for (let i = 0; i < r.length; i++) {
       const val = (r[i] || '').trim();
@@ -812,7 +818,7 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
     return null;
   }
 
-  // Live Heatmap Parser
+  // 1. LIVE HEATMAP PARSER (WL Heatmap / WL Heatmap Ordered)
   if (visId === "heatmap") {
     const headerRow = rows.find(r => r.some(c => /wins/i.test(c) && !/avg/i.test(c)) && r.some(c => /losses/i.test(c) && !/avg/i.test(c))) || rows[1] || rows[0] || [];
     const winsCol = headerRow.findIndex(c => /wins/i.test((c || '').trim()) && !/avg/i.test(c));
@@ -913,7 +919,7 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
     }
   }
 
-  // Live Power Rankings Parser
+  // 2. LIVE POWER RANKINGS PARSER (MASTER)
   if (visId === "power-rankings") {
     const headerRow = rows.find(r => r.some(c => /pwr.*rnk|power.*rank|ppg/i.test(c))) || rows[0] || [];
     const pwrCol = headerRow.findIndex(c => /new\s*pwr|power.*score/i.test(c));
@@ -1045,15 +1051,16 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
     }
   }
 
-  // Live Weekly Points Parser
+  // 3. LIVE WEEKLY POINTS PARSER (Weekly Points)
   if (visId === "weekly-points") {
     const headerRow = rows[0] || [];
     const managerRows = rows.map(r => ({ row: r, mgr: findManagerInRow(r) })).filter(x => x.mgr !== null);
 
+    // Identify active week columns that have actual numeric scores
     const activeWeeks = [];
     for (let c = 0; c < headerRow.length; c++) {
       const h = (headerRow[c] || '').trim();
-      const isWeekHeader = /^\d+$/.test(h) \vert{}\vert{} /^week\s*\d+$/i.test(h);
+      const isWeekHeader = /^\d+$/.test(h) || /^week\s*\d+$/i.test(h);
       if (isWeekHeader) {
         const hasScore = managerRows.some(x => {
           const val = (x.row[c] || '').trim();
@@ -1078,12 +1085,20 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
       const low = validScores.length ? Math.min(...validScores) : 0;
       const total = scores.reduce((sum, s) => sum + s, 0);
 
-      ptsRows.push({ manager: mgr.name, avg, scores, high, low, total });
+      ptsRows.push({
+        manager: mgr.name,
+        avg,
+        scores,
+        high,
+        low,
+        total
+      });
     }
 
     if (ptsRows.length > 0) {
       ptsRows.sort((a, b) => b.avg - a.avg);
 
+      // Compute min and max per active week for percentile gradient
       const weekMinMax = activeWeeks.map((w, wIdx) => {
         const valid = ptsRows.map(item => item.scores[wIdx]).filter(s => s > 0);
         return {
@@ -1118,7 +1133,8 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
                 ${ptsRows.map(item => `
                   <tr>
                     <td class="sticky-col"><span class="team-title-bold">${item.manager}</span></td>
-                    <td class="col-fixed-pts"><span class="score-pill" style="${getScoreGradientStyle(item.avg, avgMinMax.min, avgMinMax.max)}">${item.avg.toFixed(1)}</span></td>${item.scores.map((s, wIdx) => {
+                    <td class="col-fixed-pts"><span class="score-pill" style="${getScoreGradientStyle(item.avg, avgMinMax.min, avgMinMax.max)}">${item.avg.toFixed(1)}</span></td>
+                    ${item.scores.map((s, wIdx) => {
                       const mm = weekMinMax[wIdx] || { min: 0, max: 200 };
                       return `<td class="col-fixed-pts"><span class="score-pill" style="${getScoreGradientStyle(s, mm.min, mm.max)}">${s > 0 ? s.toFixed(1) : '—'}</span></td>`;
                     }).join('')}
@@ -1141,15 +1157,16 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
     }
   }
 
-  // Live Weekly Scoring Ranks Parser
+  // 4. LIVE WEEKLY SCORING RANKS PARSER (WeeklyPtRanks)
   if (visId === "weekly-ranks") {
     const headerRow = rows[0] || [];
     const managerRows = rows.map(r => ({ row: r, mgr: findManagerInRow(r) })).filter(x => x.mgr !== null);
 
+    // Identify active week columns
     const activeWeeks = [];
     for (let c = 0; c < headerRow.length; c++) {
       const h = (headerRow[c] || '').trim();
-      const isWeekHeader = /^\d+$/.test(h) \vert{}\vert{} /^week\s*\d+$/i.test(h);
+      const isWeekHeader = /^\d+$/.test(h) || /^week\s*\d+$/i.test(h);
       if (isWeekHeader) {
         const hasRank = managerRows.some(x => {
           const val = (x.row[c] || '').trim();
@@ -1169,7 +1186,12 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
       let avgRank = (r[2] || r[idx + 1] || '').trim();
       const ranks = activeWeeks.map(w => parseInt(r[w.col], 10) || 0);
 
-      rnkRows.push({ seasonRank, manager: mgr.name, avg: avgRank, ranks });
+      rnkRows.push({
+        seasonRank,
+        manager: mgr.name,
+        avg: avgRank,
+        ranks
+      });
     }
 
     if (rnkRows.length > 0) {
@@ -1192,7 +1214,8 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
                   <tr>
                     <td class="sticky-col"><span class="team-title-bold">${item.manager}</span></td>
                     <td class="fixed-rank-val"><span class="rank-box" style="${getRankGradientStyle(item.seasonRank)}">#${item.seasonRank}</span></td>
-                    <td class="fixed-rank-val"><span class="rank-box-wide" style="${getRankGradientStyle(item.avg)}">#${item.avg}</span></td>${item.ranks.map(r => `<td class="fixed-rank-val"><span class="rank-box" style="${getRankGradientStyle(r)}">${r}</span></td>`).join('')}
+                    <td class="fixed-rank-val"><span class="rank-box-wide" style="${getRankGradientStyle(item.avg)}">#${item.avg}</span></td>
+                    ${item.ranks.map(r => `<td class="fixed-rank-val"><span class="rank-box" style="${getRankGradientStyle(r)}">${r}</span></td>`).join('')}
                   </tr>
                 `).join('')}
               </tbody>
@@ -1203,7 +1226,7 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
     }
   }
 
-  // Live Expected Record Parser
+  // 5. LIVE EXPECTED RECORD & LUCK PARSER (ExpW-L)
   if (visId === "expected-record") {
     const expRows = [];
     for (const r of rows) {
@@ -1287,15 +1310,16 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
     }
   }
 
-  // Live Strength of Schedule Parser
+  // 6. LIVE STRENGTH OF SCHEDULE PARSER (SoS)
   if (visId === "strength-of-schedule") {
     const headerRow = rows[0] || [];
     const managerRows = rows.map(r => ({ row: r, mgr: findManagerInRow(r) })).filter(x => x.mgr !== null);
 
+    // Identify active week columns
     const activeWeeks = [];
     for (let c = 0; c < headerRow.length; c++) {
       const h = (headerRow[c] || '').trim();
-      const isWeekHeader = /^\d+$/.test(h) \vert{}\vert{} /^week\s*\d+$/i.test(h);
+      const isWeekHeader = /^\d+$/.test(h) || /^week\s*\d+$/i.test(h);
       if (isWeekHeader) {
         const hasRank = managerRows.some(x => {
           const val = (x.row[c] || '').trim();
@@ -1318,7 +1342,14 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
       const diffLabel = avgOppRank <= 4.0 ? 'Brutal' : avgOppRank <= 6.0 ? 'Tuff' : avgOppRank <= 7.5 ? 'Solid' : avgOppRank <= 9.0 ? 'Average' : 'Soft';
       const diffBadge = avgOppRank <= 4.0 ? 'diff-brutal' : avgOppRank <= 6.0 ? 'diff-tuff' : avgOppRank <= 7.5 ? 'diff-solid' : avgOppRank <= 9.0 ? 'diff-medium' : 'diff-soft';
 
-      sosRows.push({ sosRank, manager: mgr.name, avgOppRank, diffLabel, diffBadge, oppRanks });
+      sosRows.push({
+        sosRank,
+        manager: mgr.name,
+        avgOppRank,
+        diffLabel,
+        diffBadge,
+        oppRanks
+      });
     }
 
     if (sosRows.length > 0) {
@@ -1343,7 +1374,8 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
                     <td class="sticky-col"><span class="team-title-bold">${item.manager}</span></td>
                     <td class="col-sos-uniform"><span class="rank-box" style="${getRankGradientStyle(item.sosRank, true)}">#${item.sosRank}</span></td>
                     <td class="col-sos-uniform"><span class="rank-box-wide" style="${getRankGradientStyle(item.avgOppRank, true)}">#${item.avgOppRank.toFixed(2)}</span></td>
-                    <td class="col-sos-strength"><span class="diff-badge ${item.diffBadge}">${item.diffLabel}</span></td>${item.oppRanks.map(r => `<td class="col-sos-uniform"><span class="rank-box" style="${getRankGradientStyle(r, true)}">${r}</span></td>`).join('')}
+                    <td class="col-sos-strength"><span class="diff-badge ${item.diffBadge}">${item.diffLabel}</span></td>
+                    ${item.oppRanks.map(r => `<td class="col-sos-uniform"><span class="rank-box" style="${getRankGradientStyle(r, true)}">${r}</span></td>`).join('')}
                   </tr>
                 `).join('')}
               </tbody>
@@ -1354,7 +1386,7 @@ function renderLiveSheetTab(rows, visId, tabName, extraData = {}) {
     }
   }
 
-  // Generic Fallback Table
+  // 7. GENERIC STRUCTURED TABLE FALLBACK
   const validRows = rows.filter(r => r.some(c => c && c.trim() !== ""));
   const headers = validRows[0];
   const dataRows = validRows.slice(1);
@@ -1403,7 +1435,7 @@ window.FFL_DATA = {
     "weekly-ranks": renderWeeklyRanks,
     "expected-record": renderExpectedRecord,
     "heatmap": renderHeatmap,
-    "strength-of-schedule": renderStrengthOfSchedule,
-    "line-race": renderLineRace
+    "strength-of-schedule": renderStrengthOfSchedule
   }
 };
+
