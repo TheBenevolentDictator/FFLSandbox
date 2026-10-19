@@ -40,11 +40,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const sheetStatusIndicator = document.getElementById("sheet-status-indicator");
 
   // State
-  let currentSection = "datavis"; // "decks" | "datavis"
+  let currentSection = "datavis";
   let deckItems = [];
   let selectedDeckIndex = 0;
   let activeVisId = "power-rankings";
-  let activeLeagueData = window.FFL_DATA ? window.FFL_DATA.defaultData : null;
+  let activeLeagueData = (window.FFL_DATA && window.FFL_DATA.defaultData) ? window.FFL_DATA.defaultData : null;
   let isGoogleSheetActive = false;
 
   // 1. Splash Screen Dismissal
@@ -123,7 +123,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Handle all floating close buttons
   document.querySelectorAll(".fs-close-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -175,7 +174,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function initSidebarToggle() {
     const stored = localStorage.getItem("ffl_sidebar_hidden");
-    const isHidden = stored !== null ? stored === "true" : true; // Default to collapsed
+    const isHidden = stored !== null ? stored === "true" : true;
     setSidebarHidden(isHidden);
 
     if (sidebarToggleBtn) {
@@ -194,7 +193,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initSidebarToggle();
 
-  // 3. Section Switcher: Decks vs Data Vis
+  // 4. Section Switcher: Decks vs Data Vis
   function switchSection(section) {
     currentSection = section;
 
@@ -238,7 +237,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tabDatavis.addEventListener("click", () => switchSection("datavis"));
   }
 
-  // 4. Decks Loading & Rendering
+  // 5. Decks Loading & Rendering
   function loadDeck(item) {
     if (!item) return;
     if (activeBadge) activeBadge.textContent = "DECK";
@@ -284,9 +283,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 5. Data Visualizations Button Display & View Loading
+  // 6. Data Visualizations Button Display & View Loading
   function initDataVisButtons() {
-    if (!window.FFL_DATA) return;
+    if (!window.FFL_DATA || !window.FFL_DATA.visItems) return;
     const items = window.FFL_DATA.visItems;
 
     // A) Populate Sidebar Button Display
@@ -382,7 +381,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const cell = row.children[colIdx];
             if (!cell) return { type: 'empty', val: 0 };
 
-            // Check if cell contains heat-chips (e.g. Wins or Losses column in Heatmap)
             const chips = cell.querySelectorAll(".heat-chip");
             if (chips.length > 0) {
               return { type: 'num', val: chips.length };
@@ -393,7 +391,6 @@ document.addEventListener("DOMContentLoaded", () => {
               return { type: 'empty', val: 0 };
             }
 
-            // Check if it's a win-loss record like "4-0" or "2-2"
             const recMatch = raw.match(/^(\d+)[-–](\d+)$/);
             if (recMatch) {
               const w = parseInt(recMatch[1], 10);
@@ -402,7 +399,6 @@ document.addEventListener("DOMContentLoaded", () => {
               return { type: 'record', val: pct * 1000 + w };
             }
 
-            // Clean number string (remove #, +, %, commas, flags, indicators)
             const clean = raw.replace(/[🍀🔥▲▼➟➚➘#+%]/g, '').replace(/,/g, '').trim();
             const num = parseFloat(clean);
             if (!isNaN(num) && clean !== '') {
@@ -416,7 +412,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const keyA = getSortKey(rowA);
             const keyB = getSortKey(rowB);
 
-            // Empty / dash cells sink to bottom
             if (keyA.type === 'empty' && keyB.type === 'empty') return 0;
             if (keyA.type === 'empty') return 1;
             if (keyB.type === 'empty') return -1;
@@ -444,7 +439,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function loadVisualization(visId) {
     activeVisId = visId;
-    if (!window.FFL_DATA) return;
+    if (!window.FFL_DATA || !window.FFL_DATA.visItems) return;
 
     const visMeta = window.FFL_DATA.visItems.find((i) => i.id === visId);
     if (!visMeta) return;
@@ -454,7 +449,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (activeTitle) activeTitle.textContent = `${visMeta.icon} ${visMeta.title}`;
     if (activeSubtitle) activeSubtitle.textContent = visMeta.description;
 
-    // Hide external link in Data Vis mode (no link to Google Sheets)
     if (openExternal) {
       openExternal.style.display = "none";
     }
@@ -466,6 +460,15 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".mobile-vis-chip").forEach((chip) => {
       chip.classList.toggle("active", chip.dataset.visId === visId);
     });
+
+    // Special Route: Standings Line Race (Instant direct render, no Google Sheet calls)
+    if (visId === "line-race") {
+      const lineRaceRenderer = window.FFL_DATA.renderers && window.FFL_DATA.renderers["line-race"];
+      if (lineRaceRenderer && datavisContent) {
+        datavisContent.innerHTML = lineRaceRenderer();
+      }
+      return;
+    }
 
     const tabKeyMap = {
       "power-rankings": "powerRankings",
@@ -480,7 +483,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const tabName = (window.FFL_DATA.config && window.FFL_DATA.config.tabNames) ? window.FFL_DATA.config.tabNames[tabKey] : "";
     const savedSheetId = localStorage.getItem("ffl_sheet_id") || (window.FFL_DATA && window.FFL_DATA.config ? window.FFL_DATA.config.sheetId : "");
 
-    // If Google Sheet is connected, try to render live data
+    // If Google Sheet is connected, attempt live fetch
     if (savedSheetId && tabName) {
       let weeklyPrRows = liveTabCache["Weekly PR"] || null;
       if (visId === "power-rankings" && !weeklyPrRows) {
@@ -528,35 +531,32 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Default Fallback
-    const renderer = window.FFL_DATA.renderers[visId];
+    const renderer = window.FFL_DATA.renderers && window.FFL_DATA.renderers[visId];
     if (renderer && datavisContent) {
-      datavisContent.innerHTML = renderer(activeLeagueData);
-      initTableSorting(datavisContent);
-
-      // Trigger Flourish auto-sizing embed script whenever a Flourish view loads
-      if (datavisContent.querySelector(".flourish-embed")) {
-        window.FlourishLoaded = false;
-        const oldScript = document.getElementById("flourish-embed-script");
-        if (oldScript) oldScript.remove();
-
-        const script = document.createElement("script");
-        script.id = "flourish-embed-script";
-        script.src = "https://public.flourish.studio/resources/embed.js";
-        document.body.appendChild(script);
+      try {
+        datavisContent.innerHTML = renderer(activeLeagueData);
+        initTableSorting(datavisContent);
+      } catch (e) {
+        console.warn("Renderer fallback error:", e);
+        datavisContent.innerHTML = `
+          <div class="vis-view-wrapper">
+            <p class="muted-stat" style="padding: 3rem; text-align: center;">
+              ⚠️ Live Google Sheet data unavailable. Please verify sheet sharing in the sync modal.
+            </p>
+          </div>
+        `;
       }
     }
   }
 
-  // 6. Google Sheet Connection & Synchronization
+  // 7. Google Sheet Connection & Synchronization
   function extractSheetId(input) {
     if (!input) return "";
     const trimmed = input.trim();
-    // Check if it's a published 2PACX URL: /spreadsheets/d/e/(2PACX-[a-zA-Z0-9-_]+)
     const pubMatch = trimmed.match(/\/spreadsheets\/d\/e\/([a-zA-Z0-9-_]+)/);
     if (pubMatch && pubMatch[1]) {
       return pubMatch[1];
     }
-    // Check if it's a standard Google Sheet URL: /spreadsheets/d/([a-zA-Z0-9-_]+)
     const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
     if (match && match[1]) {
       return match[1];
@@ -581,11 +581,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function syncGoogleSheet(sheetId) {
-    // Clear live cache on sync
     Object.keys(liveTabCache).forEach(k => delete liveTabCache[k]);
 
     if (!sheetId) {
-      activeLeagueData = window.FFL_DATA.defaultData;
+      activeLeagueData = (window.FFL_DATA && window.FFL_DATA.defaultData) ? window.FFL_DATA.defaultData : null;
       isGoogleSheetActive = false;
       updateSheetIndicator();
       if (currentSection === "datavis") loadVisualization(activeVisId);
@@ -599,7 +598,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      // Test fetching the first tab ("MASTER")
       const tabName = window.FFL_DATA.config.tabNames.powerRankings || "MASTER";
       const rows = await window.FFL_DATA.fetchTab(sheetId, tabName, "power-rankings");
 
@@ -683,7 +681,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (syncFeedback) {
         syncFeedback.style.display = "block";
         syncFeedback.className = "sync-feedback info";
-        syncFeedback.textContent = "Reset to high-fidelity default league data.";
+        syncFeedback.textContent = "Reset to default league data.";
       }
       setTimeout(() => {
         if (sheetModal) sheetModal.style.display = "none";
@@ -691,28 +689,23 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 7. Initial Data Fetch & Boot
+  // 8. Boot & Render
   initDataVisButtons();
   updateSheetIndicator();
 
-  // Load Content Manifest (PPTs strictly under Decks)
   fetch("content.json")
     .then((res) => {
       if (!res.ok) throw new Error("Manifest could not be loaded");
       return res.json();
     })
     .then((data) => {
-      // PPT slide decks strictly belong in "slides"
       deckItems = data.filter((item) => item.type === "slides" || !item.type);
       renderDeckList(deckItems);
-
-      // Start on Master Power Rankings in Data Vis section
       switchSection("datavis");
       loadVisualization("power-rankings");
     })
     .catch((err) => {
-      console.error("Manifest load error:", err);
-      // Fallback deck item if content.json fails
+      console.warn("Manifest load error:", err);
       deckItems = [
         {
           id: "week-1-chart-party",
