@@ -125,7 +125,7 @@ const DATA_VIS_ITEMS = [
     tag: "Results & Ranks",
     description: "Visual matrix of each person's weekly scoring rank for each win and loss with bad beats and bailouts."
   },
-  {
+    {
     id: "strength-of-schedule",
     title: "Schedule Strength",
     shortTitle: "Schedule Strength",
@@ -133,6 +133,15 @@ const DATA_VIS_ITEMS = [
     badge: "Defense",
     tag: "Difficulty Rating",
     description: "Opponent scoring faced (PA), opponent rank average, and schedule difficulty ratings."
+  },
+  {
+    id: "line-race",
+    title: "Standings Race",
+    shortTitle: "Line Race",
+    icon: "🏎️",
+    badge: "Animated",
+    tag: "Season Race",
+    description: "Animated week-by-week line race across the fantasy season."
   }
 ];
 
@@ -1248,7 +1257,23 @@ window.FFL_DATA = {
     "weekly-ranks": renderWeeklyRanks,
     "expected-record": renderExpectedRecord,
     "heatmap": renderHeatmap,
-    "strength-of-schedule": renderStrengthOfSchedule
+    "strength-of-schedule": renderStrengthOfSchedule,
+    "line-race": function() {
+      setTimeout(() => {
+        window.FlourishLoaded = false;
+        const script = document.createElement("script");
+        script.src = "https://public.flourish.studio/resources/embed.js";
+        document.body.appendChild(script);
+      }, 50);
+      return `
+        <div class="vis-view-wrapper" style="padding: 1rem;">
+          <div class="flourish-embed flourish-chart" data-src="visualisation/30507835" data-height="75vh" style="width: 100%; min-height: 600px;">
+            <noscript>
+              <img src="https://public.flourish.studio/visualisation/30507835/thumbnail" width="100%" alt="chart visualization" />
+            </noscript>
+          </div>
+        </div>
+      `;
+    }
   }
 };
-
